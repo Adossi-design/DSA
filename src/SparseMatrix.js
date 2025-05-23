@@ -23,7 +23,7 @@ class SparseMatrix {
 
   /** Get value at (row, col) (returns 0 if empty) */
   get(row, col) {
-    return this.data[row]?.[col] || 0;
+    return (this.data[row] && this.data[row][col]) || 0;
   }
 
   /** Load matrix from text (like your sample files) */
