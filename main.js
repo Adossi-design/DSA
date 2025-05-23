@@ -1,36 +1,36 @@
-const testPairs = [
-  ['01_2', '01_3'],
-  ['02_1', '02_2'],
-  ['03_1', '03_2']
-];
+const fs = require('fs');
+const path = require('path');
+const SparseMatrix = require('./src/SparseMatrix');
 
-async function testAll() {
-  for (const [file1, file2] of testPairs) {
-    console.log(`\nTesting ${file1} and ${file2}`);
-    
-    const m1 = SparseMatrix.fromString(
-      fs.readFileSync(`sample_inputs/easy_sample_${file1}.txt`, 'utf8')
-    );
-    const m2 = SparseMatrix.fromString(
-      fs.readFileSync(`sample_inputs/easy_sample_${file2}.txt`, 'utf8')
-    );
+// Create results folder if missing
+if (!fs.existsSync('results')) fs.mkdirSync('results');
 
-    // Addition
-    fs.writeFileSync(
-      `results/add_${file1}_${file2}.txt`,
-      SparseMatrix.add(m1, m2).toString()
+// Process all sample files
+function processMatrices() {
+  try {
+    console.log("Loading matrices...");
+
+    // Load matrices (change filenames as needed)
+    const matrix1 = SparseMatrix.fromString(
+      fs.readFileSync('sample_inputs/easy_sample_01_2.txt', 'utf8')
+    );
+    const matrix2 = SparseMatrix.fromString(
+      fs.readFileSync('sample_inputs/easy_sample_01_3.txt', 'utf8')
     );
 
-    // Multiplication
-    try {
-      fs.writeFileSync(
-        `results/mult_${file1}_${file2}.txt`,
-        SparseMatrix.multiply(m1, m2).toString()
-      );
-    } catch (e) {
-      console.log(`Couldn't multiply ${file1} and ${file2}: ${e.message}`);
-    }
+    console.log("Adding matrices...");
+    const added = SparseMatrix.add(matrix1, matrix2);
+    fs.writeFileSync('results/addition_result.txt', added.toString());
+
+    console.log("Multiplying matrices...");
+    const multiplied = SparseMatrix.multiply(matrix1, matrix2);
+    fs.writeFileSync('results/multiplication_result.txt', multiplied.toString());
+
+    console.log("Done! Check the /results folder.");
+  } catch (error) {
+    console.error("Error:", error.message);
   }
 }
 
-testAll();
+// Run the program
+processMatrices();
