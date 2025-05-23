@@ -1,95 +1,130 @@
-/** Handles sparse matrices efficiently */
+import fs from 'fs';
+
 class SparseMatrix {
-  constructor(rows, cols) {
-    this.rows = rows;  // Total rows
-    this.cols = cols;  // Total columns
-    this.data = {};    // Stores non-zero values: {row: {col: value}}
+  constructor(numRows, numCols) {
+    this.rows = numRows;
+    this.cols = numCols;
+    this.data = new Map(); // {row: Map{col: value}}
   }
 
-  /** Set value at (row, col) */
-  set(row, col, value) {
+  static async fromFile(filePath) {
+    try {
+      const content = await fs.promises.readFile(filePath, "utf8");
+      const lines = content.split("\n").filter(line => line.trim());
+
+      // Parse dimensions
+      const rows = parseInt(lines[0].substring(5));
+      const cols = parseInt(lines[1].substring(5));
+      
+      // Validate dimensions
+      if (isNaN(rows) || isNaN(cols) || rows <= 0 || cols <= 0) {
+        throw new Error(`Invalid matrix dimensions: rows=${rows}, cols=${cols}`);
+      }
+
+      const matrix = new SparseMatrix(rows, cols);
+
+      // Parse matrix entries with bounds checking
+      for (let i = 2; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        const [row, col, value] = line.slice(1, -1).split(',').map(x => parseInt(x.trim()));
+        
+        // Skip invalid entries instead of throwing errors
+        if (row >= 0 && row < rows && col >= 0 && col < cols) {
+          matrix.setElement(row, col, value);
+        } else {
+          console.warn(`Skipping invalid position: (${row},${col}) in ${rows}x${cols} matrix`);
+        }
+      }
+
+      return matrix;
+    } catch (error) {
+      throw new Error(`Failed to read matrix file: ${filePath}\n${error.message}`);
+    }
+  }
+
+  getElement(row, col) {
+    const rowData = this.data.get(row);
+    return rowData ? rowData.get(col) || 0 : 0;
+  }
+
+  setElement(row, col, value) {
     if (value === 0) {
-      // Remove zero values to save space
-      if (this.data[row]) {
-        delete this.data[row][col];
-        if (Object.keys(this.data[row]).length === 0) delete this.data[row];
+      const rowData = this.data.get(row);
+      if (rowData) {
+        rowData.delete(col);
+        if (rowData.size === 0) {
+          this.data.delete(row);
+        }
       }
     } else {
-      // Store non-zero values
-      if (!this.data[row]) this.data[row] = {};
-      this.data[row][col] = value;
-    }
-  }
-
-  /** Get value at (row, col) (returns 0 if empty) */
-  get(row, col) {
-    return (this.data[row] && this.data[row][col]) || 0;
-  }
-
-  /** Load matrix from text (like your sample files) */
-  static fromString(text) {
-    const lines = text.split('\n').filter(line => line.trim());
-    const rows = parseInt(lines[0].split('=')[1]);
-    const cols = parseInt(lines[1].split('=')[1]);
-    const matrix = new SparseMatrix(rows, cols);
-
-    for (let i = 2; i < lines.length; i++) {
-      const [r, c, v] = lines[i].slice(1, -1).split(',').map(Number);
-      matrix.set(r, c, v);
-    }
-    return matrix;
-  }
-
-  /** Convert matrix back to text format */
-  toString() {
-    let output = `rows=${this.rows}\ncols=${this.cols}\n`;
-    for (const row in this.data) {
-      for (const col in this.data[row]) {
-        output += `(${row}, ${col}, ${this.data[row][col]})\n`;
+      if (!this.data.has(row)) {
+        this.data.set(row, new Map());
       }
+      this.data.get(row).set(col, value);
     }
-    return output;
   }
 
-  /** Add two matrices */
-  static add(a, b) {
-    if (a.rows !== b.rows || a.cols !== b.cols) throw Error("Matrix sizes must match!");
-    const result = new SparseMatrix(a.rows, a.cols);
-
-    // Copy all values from A
-    for (const row in a.data) {
-      for (const col in a.data[row]) {
-        result.set(parseInt(row), parseInt(col), a.get(parseInt(row), parseInt(col)));
-      }
+  add(other) {
+    if (this.rows !== other.rows || this.cols !== other.cols) {
+      throw new Error(`Matrix dimensions must match for addition (${this.rows}x${this.cols} vs ${other.rows}x${other.cols})`);
     }
 
-    // Add values from B
-    for (const row in b.data) {
-      for (const col in b.data[row]) {
-        const r = parseInt(row), c = parseInt(col);
-        result.set(r, c, result.get(r, c) + b.get(r, c));
+    const result = new SparseMatrix(this.rows, this.cols);
+
+    // Add elements from both matrices
+    const allRows = new Set([...this.data.keys(), ...other.data.keys()]);
+    for (const row of allRows) {
+      const cols = new Set([
+        ...(this.data.get(row)?.keys() || []),
+        ...(other.data.get(row)?.keys() || [])
+      ]);
+      
+      for (const col of cols) {
+        result.setElement(row, col, this.getElement(row, col) + other.getElement(row, col));
       }
     }
 
     return result;
   }
 
-  /** Multiply two matrices */
-  static multiply(a, b) {
-    if (a.cols !== b.rows) throw Error("Cannot multiply: columns(A) ≠ rows(B)");
-    const result = new SparseMatrix(a.rows, b.cols);
+  subtract(other) {
+    if (this.rows !== other.rows || this.cols !== other.cols) {
+      throw new Error(`Matrix dimensions must match for subtraction (${this.rows}x${this.cols} vs ${other.rows}x${other.cols})`);
+    }
 
-    for (const rowA in a.data) {
-      for (const colA in a.data[rowA]) {
-        const valA = a.data[rowA][colA];
-        if (b.data[colA]) {
-          for (const colB in b.data[colA]) {
-            const valB = b.data[colA][colB];
-            result.set(
-              parseInt(rowA),
-              parseInt(colB),
-              result.get(parseInt(rowA), parseInt(colB)) + valA * valB
-            );
+    const result = new SparseMatrix(this.rows, this.cols);
+
+    // Subtract elements from both matrices
+    const allRows = new Set([...this.data.keys(), ...other.data.keys()]);
+    for (const row of allRows) {
+      const cols = new Set([
+        ...(this.data.get(row)?.keys() || []),
+        ...(other.data.get(row)?.keys() || [])
+      ]);
+      
+      for (const col of cols) {
+        result.setElement(row, col, this.getElement(row, col) - other.getElement(row, col));
+      }
+    }
+
+    return result;
+  }
+
+  multiply(other) {
+    if (this.cols !== other.rows) {
+      throw new Error(`Invalid dimensions for multiplication: ${this.rows}x${this.cols} * ${other.rows}x${other.cols}`);
+    }
+
+    const result = new SparseMatrix(this.rows, other.cols);
+
+    // Efficient multiplication using only non-zero elements
+    for (const [i, rowData] of this.data) {
+      for (const [k, aVal] of rowData) {
+        if (other.data.has(k)) {
+          for (const [j, bVal] of other.data.get(k)) {
+            result.setElement(i, j, result.getElement(i, j) + aVal * bVal);
           }
         }
       }
@@ -97,6 +132,16 @@ class SparseMatrix {
 
     return result;
   }
+
+  toString() {
+    let result = `rows=${this.rows}\ncols=${this.cols}\n`;
+    for (const [row, rowData] of this.data) {
+      for (const [col, value] of rowData) {
+        result += `(${row}, ${col}, ${value})\n`;
+      }
+    }
+    return result;
+  }
 }
 
-module.exports = SparseMatrix;
+export default SparseMatrix;
