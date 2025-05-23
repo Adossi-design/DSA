@@ -15,7 +15,7 @@ function processMatrices() {
       fs.readFileSync('sample_inputs/easy_sample_01_2.txt', 'utf8')
     );
     const matrix2 = SparseMatrix.fromString(
-      fs.readFileSync('sample_inputs/easy_sample_01_3.txt', 'utf8')
+      fs.readFileSync('sample_inputs/easy_sample_02_1.txt', 'utf8')
     );
 
     console.log("Adding matrices...");
