@@ -1,38 +1,36 @@
-const fs = require('fs');
-const path = require('path');
-const SparseMatrix = require('./src/sparseMatrix');
+const testPairs = [
+  ['01_2', '01_3'],
+  ['02_1', '02_2'],
+  ['03_1', '03_2']
+];
 
-// Create results folder
-if (!fs.existsSync('results')) fs.mkdirSync('results');
+async function testAll() {
+  for (const [file1, file2] of testPairs) {
+    console.log(`\nTesting ${file1} and ${file2}`);
+    
+    const m1 = SparseMatrix.fromString(
+      fs.readFileSync(`sample_inputs/easy_sample_${file1}.txt`, 'utf8')
+    );
+    const m2 = SparseMatrix.fromString(
+      fs.readFileSync(`sample_inputs/easy_sample_${file2}.txt`, 'utf8')
+    );
 
-async function main() {
-  try {
-    console.log("Starting matrix operations...");
-    
-    // Load matrices
-    console.log("Loading sample files...");
-    const file1 = fs.readFileSync('sample_inputs/easy_sample_01_1.txt', 'utf8');
-    const file2 = fs.readFileSync('sample_inputs/easy_sample_01_2.txt', 'utf8');
-    const matrix1 = SparseMatrix.fromString(file1);
-    const matrix2 = SparseMatrix.fromString(file2);
-    
-    console.log(`Matrix 1: ${matrix1.rows}x${matrix1.cols}`);
-    console.log(`Matrix 2: ${matrix2.rows}x${matrix2.cols}`);
-    
     // Addition
-    console.log("Adding matrices...");
-    const added = SparseMatrix.add(matrix1, matrix2);
-    fs.writeFileSync('results/addition.txt', added.toString());
-    
+    fs.writeFileSync(
+      `results/add_${file1}_${file2}.txt`,
+      SparseMatrix.add(m1, m2).toString()
+    );
+
     // Multiplication
-    console.log("Multiplying matrices...");
-    const multiplied = SparseMatrix.multiply(matrix1, matrix2);
-    fs.writeFileSync('results/multiplication.txt', multiplied.toString());
-    
-    console.log("Done! Results saved in /results folder");
-  } catch (error) {
-    console.error("Error:", error.message);
+    try {
+      fs.writeFileSync(
+        `results/mult_${file1}_${file2}.txt`,
+        SparseMatrix.multiply(m1, m2).toString()
+      );
+    } catch (e) {
+      console.log(`Couldn't multiply ${file1} and ${file2}: ${e.message}`);
+    }
   }
 }
 
-main();
+testAll();
